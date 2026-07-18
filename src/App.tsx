@@ -48,12 +48,26 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+  async function loadMessages() {
     if (!activeId) {
       setMessages([]);
       return;
     }
-    getMessages(activeId).then(setMessages);
-  }, [activeId]);
+
+    const msgs = await getMessages(activeId);
+
+    const decryptedMessages = await Promise.all(
+      msgs.map(async (m) => ({
+        ...m,
+        encryptedContent: await decrypt(m.encryptedContent),
+      }))
+    );
+
+    setMessages(decryptedMessages);
+  }
+
+  loadMessages();
+}, [activeId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -106,7 +120,13 @@ export default function App() {
     role: "user",
     encryptedContent: await encrypt(userText),
 });
-    setMessages((m) => [...m, userMsg]);
+    setMessages((m) => [
+  ...m,
+  {
+    ...userMsg,
+    encryptedContent: userText,
+  },
+]);
 
     // Local-only "learning": look for a fact worth remembering, store it,
     // and let the user see/delete it immediately.
@@ -116,12 +136,16 @@ export default function App() {
       setFacts(await listProfileFacts());
     }
 
-    const history = await Promise.all(
-  [...messages, userMsg].map(async (m) => ({
-    role: m.role,
-    content: await decrypt(m.encryptedContent),
-  }))
-);
+    const history = [
+  ...messages,
+  {
+    role: "user",
+    encryptedContent: userText,
+  },
+].map((m) => ({
+  role: m.role,
+  content: m.encryptedContent,
+}));
 
     const replyText = await generateReply(history);
     const assistantMsg = await addMessage({
@@ -129,7 +153,13 @@ export default function App() {
     role: "assistant",
     encryptedContent: await encrypt(replyText),
 });
-    setMessages((m) => [...m, assistantMsg]);
+    setMessages((m) => [
+  ...m,
+  {
+    ...assistantMsg,
+    encryptedContent: replyText,
+  },
+]);
     setConversations(await listConversations());
     setSending(false);
   }
@@ -175,17 +205,10 @@ export default function App() {
         </div>
 
         <div className="profile-panel">
-          <div className="profile-header">What the AI has learned about you</div>
-          {facts.length === 0 && <div className="profile-empty">Nothing yet.</div>}
-          {facts.map((f) => (
-            <div key={f.id} className="fact-item">
-              <span>{f.encryptedFact}</span>
-              <button onClick={() => handleDeleteFact(f.id)} title="Forget this fact">
-                ✕
-              </button>
-            </div>
-          ))}
-        </div>
+  <div className="profile-header">
+    Learned profile (Coming Soon)
+  </div>
+</div>
 
         <div className="consent-panel">
           <button className="btn-ghost" onClick={() => recordConsentEvent("consent_given")}>
