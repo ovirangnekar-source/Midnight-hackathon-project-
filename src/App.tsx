@@ -16,8 +16,6 @@ import {
 import { generateReply, extractCandidateFact, initEngine } from "./lib/llm";
 import { createConsentCommitment, type ConsentAction } from "./lib/midnight";
 
-type Theme = "dark" | "light" | "fantasy";
-
 export default function App() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -28,16 +26,10 @@ export default function App() {
   const [modelStatus, setModelStatus] = useState("Initializing local model…");
   const [sending, setSending] = useState(false);
   const [lastCommitment, setLastCommitment] = useState<string | null>(null);
-  const [theme, setTheme] = useState<Theme>(
-    () => (localStorage.getItem("chat-theme") as Theme) || "dark"
-  );
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("chat-theme", theme);
-  }, [theme]);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     (async () => {
@@ -50,10 +42,8 @@ export default function App() {
         await initEngine((msg) => setModelStatus(msg));
         setLoadingModel(false);
       } catch (e) {
-        console.error("Model init failed:", e);
-        const detail = e instanceof Error ? e.message : String(e);
         setModelStatus(
-          `Failed to start the local model: ${detail}. Check the browser console for details.`
+          "WebGPU is not available on this browser/device. Try an up-to-date Chrome."
         );
       }
     })();
@@ -70,7 +60,29 @@ export default function App() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
+  useEffect(() => {
+  const savedTheme = localStorage.getItem("theme");
 
+  if (savedTheme === "dark" || savedTheme === "light") {
+    setTheme(savedTheme);
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  } else {
+    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const initialTheme = prefersDark ? "dark" : "light";
+
+    setTheme(initialTheme);
+    document.documentElement.setAttribute("data-theme", initialTheme);
+  }
+  }, []);
+  function toggleTheme() {
+  const nextTheme = theme === "dark" ? "light" : "dark";
+
+  setTheme(nextTheme);
+
+  document.documentElement.setAttribute("data-theme", nextTheme);
+
+  localStorage.setItem("theme", nextTheme);
+  }
   async function handleNewConversation() {
     const conv = await createConversation();
     setConversations(await listConversations());
@@ -113,7 +125,7 @@ export default function App() {
     setInput("");
     setSending(true);
 
-    const userMsg = await addMessage({ conversationId: convId, role: "user", content: userText });
+    const userMsg = await addMessage({ conversationId: convId, role: "user", encryptedContent: userText });
     setMessages((m) => [...m, userMsg]);
 
     // Local-only "learning": look for a fact worth remembering, store it,
@@ -126,14 +138,14 @@ export default function App() {
 
     const history = [...messages, userMsg].map((m) => ({
       role: m.role,
-      content: m.content,
+      content: m.encryptedContent,
     }));
 
     const replyText = await generateReply(history);
     const assistantMsg = await addMessage({
       conversationId: convId,
       role: "assistant",
-      content: replyText,
+      encryptedContent: replyText,
     });
     setMessages((m) => [...m, assistantMsg]);
     setConversations(await listConversations());
@@ -147,46 +159,29 @@ export default function App() {
   }
 
   return (
-    <div className="app">
-      <button
-        className="mobile-menu-btn"
-        onClick={() => setSidebarOpen((v) => !v)}
-        aria-label="Toggle menu"
-      >
-        ☰
-      </button>
-
-      {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
-
-      <aside className={"sidebar" + (sidebarOpen ? " open" : "")}>
+  <div className={`app ${sidebarOpen ? "sidebar-open" : ""}`}>
+      <aside className="sidebar">
         <div className="brand">
-          <span className="brand-mark">◐</span>
-          <span className="brand-name">private chat</span>
-        </div>
+  <div className="brand-left">
+    <div className="brand-icon">🛡️</div>
 
-        <div className="theme-switcher">
-          <button
-            className={theme === "dark" ? "theme-btn active" : "theme-btn"}
-            onClick={() => setTheme("dark")}
-            title="Dark"
-          >
-            🌙
-          </button>
-          <button
-            className={theme === "light" ? "theme-btn active" : "theme-btn"}
-            onClick={() => setTheme("light")}
-            title="Light"
-          >
-            ☀️
-          </button>
-          <button
-            className={theme === "fantasy" ? "theme-btn active" : "theme-btn"}
-            onClick={() => setTheme("fantasy")}
-            title="Fantasy"
-          >
-            ✨
-          </button>
-        </div>
+    <div className="brand-info">
+      <h2>Vault AI</h2>
+      <p>Local-first • Privacy-focused • User-owned</p>
+    </div>
+  </div>
+
+  <button
+      className={`theme-switch ${theme}`}
+      onClick={toggleTheme}
+      aria-label="Toggle theme"
+    >
+      <div className="switch-thumb">
+        {theme === "dark" ? "🌙" : "☀️"}
+      </div>
+    </button>
+  </div>
+
 
         <button className="btn-new" onClick={handleNewConversation}>
           + New conversation
@@ -197,10 +192,7 @@ export default function App() {
             <div
               key={c.id}
               className={"conv-item" + (c.id === activeId ? " active" : "")}
-              onClick={() => {
-                setActiveId(c.id);
-                setSidebarOpen(false);
-              }}
+              onClick={() => setActiveId(c.id)}
             >
               <span className="conv-title">{c.title}</span>
               <button
@@ -254,16 +246,47 @@ export default function App() {
       </aside>
 
       <main className="chat">
+        <div className="mobile-header">
+  <button
+    className="menu-button"
+    onClick={() => setSidebarOpen(!sidebarOpen)}
+  >
+    ☰
+  </button>
+
+  <h2>Vault AI</h2>
+</div>
         {loadingModel && (
-          <div className="model-loading">
-            <div className="spinner" />
-            <p>{modelStatus}</p>
-            <p className="model-loading-sub">
-              The model downloads once and stays cached in your browser.
-              Every reply after that is generated locally, with no network calls.
-            </p>
-          </div>
-        )}
+  <div className="model-loading">
+
+    <div className="loading-logo">🛡️</div>
+
+    <h2>Loading Vault AI</h2>
+
+    <p className="loading-title">
+      Preparing your local AI assistant
+    </p>
+
+    <div className="spinner" />
+
+    <div className="loading-status">
+      {modelStatus}
+    </div>
+
+    <div className="loading-note">
+      This is a one-time download.
+      <br />
+      Future conversations start instantly.
+    </div>
+
+    <div className="loading-benefits">
+      <div>✓ Runs entirely inside your browser</div>
+      <div>✓ No cloud API</div>
+      <div>✓ No personal data uploaded</div>
+    </div>
+
+  </div>
+)}
 
         <div className="messages" ref={scrollRef}>
           {messages.length === 0 && !loadingModel && (
@@ -306,3 +329,4 @@ export default function App() {
     </div>
   );
 }
+
