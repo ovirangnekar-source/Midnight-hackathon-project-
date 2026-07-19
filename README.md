@@ -1,4 +1,4 @@
-🔐 VaultAI — Your AI, Protected in Your Personal Vault
+# VaultAI — Your AI, Protected in Your Personal Vault
 
 VaultAI is a privacy-first AI assistant that eliminates centralized data-center storage by running entirely on the user's device. Unlike traditional AI assistants that send conversations to remote servers, VaultAI performs AI inference locally using WebLLM and stores all user data in the browser using IndexedDB.
 
