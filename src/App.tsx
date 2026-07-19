@@ -26,9 +26,6 @@ export default function App() {
   const [modelStatus, setModelStatus] = useState("Initializing local model…");
   const [sending, setSending] = useState(false);
   const [lastCommitment, setLastCommitment] = useState<string | null>(null);
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,29 +57,7 @@ export default function App() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages]);
-  useEffect(() => {
-  const savedTheme = localStorage.getItem("theme");
 
-  if (savedTheme === "dark" || savedTheme === "light") {
-    setTheme(savedTheme);
-    document.documentElement.setAttribute("data-theme", savedTheme);
-  } else {
-    const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    const initialTheme = prefersDark ? "dark" : "light";
-
-    setTheme(initialTheme);
-    document.documentElement.setAttribute("data-theme", initialTheme);
-  }
-  }, []);
-  function toggleTheme() {
-  const nextTheme = theme === "dark" ? "light" : "dark";
-
-  setTheme(nextTheme);
-
-  document.documentElement.setAttribute("data-theme", nextTheme);
-
-  localStorage.setItem("theme", nextTheme);
-  }
   async function handleNewConversation() {
     const conv = await createConversation();
     setConversations(await listConversations());
@@ -125,7 +100,7 @@ export default function App() {
     setInput("");
     setSending(true);
 
-    const userMsg = await addMessage({ conversationId: convId, role: "user", encryptedContent: userText });
+    const userMsg = await addMessage({ conversationId: convId, role: "user", content: userText });
     setMessages((m) => [...m, userMsg]);
 
     // Local-only "learning": look for a fact worth remembering, store it,
@@ -138,14 +113,14 @@ export default function App() {
 
     const history = [...messages, userMsg].map((m) => ({
       role: m.role,
-      content: m.encryptedContent,
+      content: m.content,
     }));
 
     const replyText = await generateReply(history);
     const assistantMsg = await addMessage({
       conversationId: convId,
       role: "assistant",
-      encryptedContent: replyText,
+      content: replyText,
     });
     setMessages((m) => [...m, assistantMsg]);
     setConversations(await listConversations());
@@ -159,29 +134,12 @@ export default function App() {
   }
 
   return (
-  <div className={`app ${sidebarOpen ? "sidebar-open" : ""}`}>
+    <div className="app">
       <aside className="sidebar">
         <div className="brand">
-  <div className="brand-left">
-    <div className="brand-icon">🛡️</div>
-
-    <div className="brand-info">
-      <h2>Vault AI</h2>
-      <p>Local-first • Privacy-focused • User-owned</p>
-    </div>
-  </div>
-
-  <button
-      className={`theme-switch ${theme}`}
-      onClick={toggleTheme}
-      aria-label="Toggle theme"
-    >
-      <div className="switch-thumb">
-        {theme === "dark" ? "🌙" : "☀️"}
-      </div>
-    </button>
-  </div>
-
+          <span className="brand-mark">◐</span>
+          <span className="brand-name">private chat</span>
+        </div>
 
         <button className="btn-new" onClick={handleNewConversation}>
           + New conversation
@@ -246,47 +204,16 @@ export default function App() {
       </aside>
 
       <main className="chat">
-        <div className="mobile-header">
-  <button
-    className="menu-button"
-    onClick={() => setSidebarOpen(!sidebarOpen)}
-  >
-    ☰
-  </button>
-
-  <h2>Vault AI</h2>
-</div>
         {loadingModel && (
-  <div className="model-loading">
-
-    <div className="loading-logo">🛡️</div>
-
-    <h2>Loading Vault AI</h2>
-
-    <p className="loading-title">
-      Preparing your local AI assistant
-    </p>
-
-    <div className="spinner" />
-
-    <div className="loading-status">
-      {modelStatus}
-    </div>
-
-    <div className="loading-note">
-      This is a one-time download.
-      <br />
-      Future conversations start instantly.
-    </div>
-
-    <div className="loading-benefits">
-      <div>✓ Runs entirely inside your browser</div>
-      <div>✓ No cloud API</div>
-      <div>✓ No personal data uploaded</div>
-    </div>
-
-  </div>
-)}
+          <div className="model-loading">
+            <div className="spinner" />
+            <p>{modelStatus}</p>
+            <p className="model-loading-sub">
+              The model downloads once and stays cached in your browser.
+              Every reply after that is generated locally, with no network calls.
+            </p>
+          </div>
+        )}
 
         <div className="messages" ref={scrollRef}>
           {messages.length === 0 && !loadingModel && (
@@ -329,4 +256,3 @@ export default function App() {
     </div>
   );
 }
-
