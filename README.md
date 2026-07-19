@@ -1,4 +1,4 @@
-VaultAI 🔐
+#VaultAI 🔐
 
 Your AI, Protected in Your Personal Vault
 
