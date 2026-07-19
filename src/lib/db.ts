@@ -73,7 +73,8 @@ export async function getMessages(conversationId: string) {
 
 export async function addMessage(msg: Omit<ChatMessage, "id" | "createdAt">) {
   const full: ChatMessage = { ...msg, createdAt: Date.now() };
-  await db.messages.add(full);
+  const id = await db.messages.add(full);
+  full.id = id;
   await db.conversations.update(msg.conversationId, { updatedAt: Date.now() });
   return full;
 }
